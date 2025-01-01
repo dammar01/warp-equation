@@ -16,7 +16,7 @@
 
 ```bash
 git clone https://github.com/dammar01/warp-equation.git
-cd api-voice-to-text
+cd warp-equation
 ```
 
 ### 2. Set Up a Virtual Environment
