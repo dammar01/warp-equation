@@ -1,3 +1,4 @@
+# setup
 from collections import defaultdict
 from scipy import stats
 from datetime import datetime
@@ -51,9 +52,15 @@ class GachaDataProcessor:
             rate_on = False
             unique_char = []
             unique_lc = []
+            item_r4 = 0
+            item_r3 = 0
             for item in items:
                 item_id = item["item_id"]
                 item_type = item["item_type"]
+                if item["rank_type"] == "4":
+                    item_r4 += 1
+                elif item["rank_type"] == "3":
+                    item_r3 += 1
                 if item_id not in unique_char and item_type != "Character":
                     unique_char.append(item_id)
                 elif item_id not in unique_lc and item_type != "Light Cone":
@@ -76,12 +83,16 @@ class GachaDataProcessor:
                             "gacha_id": item["gacha_id"],
                             "item_id": item_id,
                             "pity": pity_count,
+                            "item_r4": item_r4,
+                            "item_r3": item_r3,
                             "unique_character": unique_char,
                             "unique_light_cone": unique_lc,
                             "status": status if not gct == "1" else "Guarented",
                             "time": item["time"],
                         }
                     )
+                    item_r3 = 0
+                    item_r4 = 0
                     pity_count = 1
                 else:
                     pity_count += 1
@@ -94,6 +105,8 @@ class GachaDataProcessor:
                 "char_collection": [],
                 "lc_collection": [],
                 "total_warp": 0,
+                "total_r4": 0,
+                "total_r3": 0,
                 "win": 0,
                 "lose": 0,
                 "guarented": 0,
@@ -104,6 +117,8 @@ class GachaDataProcessor:
             gacha_type = gc["gacha_type"]
             pity = int(gc["pity"])
             pity_data[gacha_type]["pity"].append(pity)
+            pity_data[gacha_type]["total_r4"] += gc["item_r4"]
+            pity_data[gacha_type]["total_r3"] += gc["item_r3"]
             pity_data[gacha_type]["char_collection"].extend(
                 [
                     char
@@ -131,7 +146,9 @@ class GachaDataProcessor:
             res.append(
                 {
                     "gacha_type": gacha_type,
-                    "total_item": len(data["pity"]),
+                    "total_item_r5": len(data["pity"]),
+                    "total_item_r4": data["total_r4"],
+                    "total_item_r3": data["total_r3"],
                     "total_unique_character": len(data["char_collection"]),
                     "total_unique_light_cone": len(data["lc_collection"]),
                     "total_win": data["win"],
@@ -279,8 +296,8 @@ class GachaDataProcessor:
     def __get_pity_rate(self, stat: list):
         res = []
         for data in stat:
-            win_rate = self.safe_divide(data["total_win"], data["total_item"])
-            lose_rate = self.safe_divide(data["total_lose"], data["total_item"])
+            win_rate = self.safe_divide(data["total_win"], data["total_item_r5"])
+            lose_rate = self.safe_divide(data["total_lose"], data["total_item_r5"])
             collection_rate = self.safe_divide(
                 data["total_unique_light_cone"] + data["total_unique_character"],
                 len(self.hsr_datasets["Character"])
@@ -292,7 +309,7 @@ class GachaDataProcessor:
                     "win_rate": round(win_rate * 100, 2),
                     "lose_rate": round(lose_rate * 100, 2),
                     "guarented_rate": round(
-                        self.safe_divide(data["total_guarented"], data["total_item"])
+                        self.safe_divide(data["total_guarented"], data["total_item_r5"])
                         * 100,
                         2,
                     ),
@@ -364,7 +381,10 @@ class VisualizeData:
 
     def distribute_item(self):
         gacha_types = [entry["gacha_type"] for entry in self.data.statistic]
-        categories = ["total_item", "total_unique_character", "total_unique_light_cone"]
+        categories = [
+            "total_unique_character",
+            "total_unique_light_cone",
+        ]
         values = {
             cat: [entry[cat] for entry in self.data.statistic] for cat in categories
         }
@@ -376,11 +396,7 @@ class VisualizeData:
                 x + i * width,
                 vals,
                 width,
-                label=(
-                    cat.capitalize().replace("_", " ")
-                    if cat != "total_item"
-                    else cat.capitalize().replace("_", " ") + " ★5"
-                ),
+                label=(cat.capitalize().replace("_", " ")),
             )
             for bar in bars:
                 yval = bar.get_height()
@@ -393,7 +409,7 @@ class VisualizeData:
                     color="white",
                 )
 
-        ax.set_title("Distribution of Items by Gacha Type")
+        ax.set_title("Distribution of Items")
         ax.set_xlabel("Gacha Type")
         ax.set_ylabel("Total")
         ax.set_xticks(x + width)
@@ -410,7 +426,7 @@ class VisualizeData:
         fig, ax = plt.subplots(figsize=(8, 6))
         bp = ax.boxplot(pity_data, patch_artist=True, showmeans=True)
 
-        ax.set_title("Pity Statistics by Gacha Type")
+        ax.set_title("Pity Statistics")
         ax.set_xlabel("Gacha Type")
         ax.set_ylabel("Pity Value")
         ax.set_xticks(range(1, len(gacha_types) + 1))
@@ -515,7 +531,7 @@ class VisualizeData:
                 alpha=0 if g == 0 else 1,
             )
 
-        ax.set_title("Win/Lose/Guaranteed Rates by Gacha Type")
+        ax.set_title("Win/Lose/Guaranteed Rates")
         ax.set_xlabel("Proportion in percentage")
         ax.set_ylabel("Gacha Type")
         ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0)
@@ -574,3 +590,35 @@ class VisualizeData:
             all_hour_data.extend(flat_hours)
             draw_diagram(flat_weekdays, flat_hours, gacha_type)
         draw_diagram(all_weekday_data, all_hour_data, "All")
+
+    def pity_change(self):
+        df = pd.DataFrame(self.data.pity_data)
+        df["time"] = pd.to_datetime(df["time"])
+        df = df.sort_values(by="time")
+        grouped = df.groupby("gacha_type")["pity"].sum().reset_index()
+
+        plt.figure(figsize=(8, 6))
+        for gacha_type in grouped["gacha_type"].unique():
+            gacha_data = df[df["gacha_type"] == gacha_type]
+            plt.plot(
+                gacha_data["time"], gacha_data["pity"], label=f"Gacha Type {gacha_type}"
+            )
+            for i in range(len(gacha_data)):
+                plt.annotate(
+                    gacha_data["pity"].iloc[i],
+                    (gacha_data["time"].iloc[i], gacha_data["pity"].iloc[i]),
+                    textcoords="offset points",
+                    xytext=(0, 5),
+                    ha="center",
+                    fontsize=9,
+                )
+
+        plt.title("Pity Changes Over Time")
+        plt.xlabel("Time")
+        plt.ylabel("Pity")
+        plt.grid(True)
+        plt.legend(title="Gacha Type")
+        plt.xticks(rotation=30)
+
+        plt.tight_layout()
+        plt.show()
