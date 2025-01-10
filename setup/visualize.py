@@ -1,14 +1,17 @@
 from matplotlib.lines import Line2D
 from .data_processor import GachaDataProcessor
+from .equation_processor import EquationProcessor
 import numpy as np
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+import copy
 
 
 class VisualizeData:
     def __init__(self, uid, rank_type):
         self.data = GachaDataProcessor(uid, rank_type)
+        self.equation = EquationProcessor(uid, rank_type)
 
     def distribute_item(self):
         gacha_types = [entry["gacha_type"] for entry in self.data.statistic]
@@ -223,26 +226,29 @@ class VisualizeData:
         draw_diagram(all_weekday_data, all_hour_data, "All")
 
     def pity_change(self):
-        df = pd.DataFrame(self.data.pity_data)
-        df["time"] = pd.to_datetime(df["time"])
-        df = df.sort_values(by="time")
-        grouped = df.groupby("gacha_type")["pity"].sum().reset_index()
+        df = pd.DataFrame(self.data.cleaned_data)
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df = df.sort_values(by="datetime")
+        grouped = df.groupby("gacha_type")["pity_r5"].sum().reset_index()
 
         plt.figure(figsize=(8, 6))
         for gacha_type in grouped["gacha_type"].unique():
             gacha_data = df[df["gacha_type"] == gacha_type]
             plt.plot(
-                gacha_data["time"], gacha_data["pity"], label=f"Gacha Type {gacha_type}"
+                gacha_data["datetime"],
+                gacha_data["pity_r5"],
+                label=f"Gacha Type {gacha_type}",
             )
             for i in range(len(gacha_data)):
-                plt.annotate(
-                    gacha_data["pity"].iloc[i],
-                    (gacha_data["time"].iloc[i], gacha_data["pity"].iloc[i]),
-                    textcoords="offset points",
-                    xytext=(0, 5),
-                    ha="center",
-                    fontsize=9,
-                )
+                if gacha_data["rank_type"].iloc[i] == 5:
+                    plt.annotate(
+                        gacha_data["pity_r5"].iloc[i],
+                        (gacha_data["datetime"].iloc[i], gacha_data["pity_r5"].iloc[i]),
+                        textcoords="offset points",
+                        xytext=(0, 5),
+                        ha="center",
+                        fontsize=9,
+                    )
 
         plt.title("Pity Changes Over Time")
         plt.xlabel("Time")
@@ -252,4 +258,22 @@ class VisualizeData:
         plt.xticks(rotation=30)
 
         plt.tight_layout()
+        plt.show()
+
+    def check_correlation(self, except_col: list):
+        df = pd.DataFrame(copy.deepcopy(self.data.cleaned_data))
+        for col in except_col:
+            df = df.drop(col, axis=1)
+        correlation_matrix = df.corr()
+        plt.figure(figsize=(18, 6))
+        sns.heatmap(
+            correlation_matrix,
+            annot=True,
+            cmap="coolwarm",
+            fmt=".2f",
+            vmin=-1,
+            vmax=1,
+        )
+        print(f"Total data : {len(df)}")
+        plt.title(f"Correlation Matrix Heatmap")
         plt.show()
