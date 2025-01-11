@@ -274,6 +274,5 @@ class VisualizeData:
             vmin=-1,
             vmax=1,
         )
-        print(f"Total data : {len(df)}")
         plt.title(f"Correlation Matrix Heatmap")
         plt.show()
