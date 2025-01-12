@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 class MethodProcessor:
-    def gauss_seidel(self, A, b, tol=1e-10, max_iter=100):
+    def gauss_seidel(self, A, b, tol=0.001, max_iter=100):
         n = len(A)
         x = np.zeros_like(b, dtype=float)
         if np.any(np.diag(A) == 0):
@@ -23,7 +23,9 @@ class MethodProcessor:
             error = np.linalg.norm(x_new - x, ord=np.inf)
             iteration_info = {
                 "iteration": iteration,
-                "x_values": x_new.copy(),
+                "Total_warp": x_new[0],
+                "Total_r5": x_new[1],
+                "Total_r4": x_new[2],
                 "error": error,
             }
 
@@ -42,7 +44,7 @@ class MethodProcessor:
         iteration_data[-1]["status"] = "Not Converged"
         return pd.DataFrame(iteration_data)
 
-    def jacobi(self, A, b, tol=1e-10, max_iter=100):
+    def jacobi(self, A, b, tol=0.001, max_iter=100):
         n = len(b)
         x = np.zeros_like(b, dtype=float)
         iteration_data = []
